@@ -416,15 +416,15 @@ stemanalysism <- function(xtree, stemgrowth = FALSE,
   drawStemgrowth <- function() {
 
     # Open a new graph frame which names as “Stem growth trend”
-    dev.new(title = "Stem growth trend", width = 4500,
-            height = 4500, noRStudioGD = TRUE)
+    dev.new(title = "Stem growth trend", width = 6.5,
+            height = 7.5, noRStudioGD = TRUE)
 
 
     # Define the parameters of the graph
-    mat <- matrix(c(1, 1, 1, 2, 3, 4, 5, 6, 7), 3, 3, byrow = FALSE)
+    mat <- matrix(c(1, 1, 1, 1, 2, 3, 4, 8, 5, 6, 7, 8), 4, 3, byrow = FALSE)
 
     # mat
-    layout(mat)
+    layout(mat, heights = c(2,2,2,1))
     layout.show(7)
     par(oma = c(0, 0, 0, 0), mar = c(5, 5, 1, 1))
 
@@ -557,11 +557,6 @@ stemanalysism <- function(xtree, stemgrowth = FALSE,
     with(output$StemGrowth, lines(stemdj, AvincreD, lty = "dotted", pch = 16,
                                   col = "red", lwd = 2, cex = 1.2))
     legend("topleft", "(e)", cex = 1.1, box.lty = 0, bg = NULL)
-    legend("topright",
-           col = c("blue", "red"), cex = 1, box.lty = 0, lwd = 2,
-           lty = c("dashed", "dotted"), bg = NULL,
-           c("Current annual increment", "Mean annual increment")
-    )
 
     with(output$StemGrowth, plot(stemdj, AnincreH, type = "l", lty = "dashed", pch = 1,
                                  col = "blue", lwd = 2, cex = 1.2,
@@ -586,6 +581,14 @@ stemanalysism <- function(xtree, stemgrowth = FALSE,
     with(output$StemGrowth, lines(stemdj, AvincreV, lty = "dotted", pch = 16,
                                   col = "red", lwd = 2, cex = 1.2))
     legend("topleft", "(g)", cex = 1.1, box.lty = 0, bg = NULL)
+
+    plot(0, 0, type = "n", ann = F, axes = F)
+    legend("center",
+           inset=c(0, 0),
+           col = c("blue", "red"), cex = 1, box.lty = 0, lwd = 2,
+           lty = c("dashed", "dotted"), bg = NULL,
+           c("Current annual increment", "Mean annual increment")
+    )
   }
 
   # Whether to call the stemgrowth graph
@@ -608,7 +611,7 @@ stemanalysism <- function(xtree, stemgrowth = FALSE,
       # Open a new graph frame
       dev.new(title =
                 "tree biomass and carbon storage estimated by allometric models",
-              width = 4500, height = 2250, noRStudioGD = TRUE)
+              width = 6.5, height = 3.25, noRStudioGD = TRUE)
 
       # Define the parameters of graph
       mat <- matrix(c(1,2),1,2,byrow=FALSE)
@@ -651,7 +654,7 @@ stemanalysism <- function(xtree, stemgrowth = FALSE,
       # Open a new graph frame
       dev.new(title =
                 "tree biomass and carbon storage estimated by volume model",
-              width = 4500, height = 2250, noRStudioGD = TRUE)
+              width = 6.5, height = 3.25, noRStudioGD = TRUE)
 
       # Define the parameters of graph
       mat <- matrix(c(1,2),1,2,byrow=FALSE)
@@ -698,7 +701,7 @@ stemanalysism <- function(xtree, stemgrowth = FALSE,
   allomHD <- function() {
     # Open a new graph frame
     dev.new(title = "height-diameter relationships",
-            width = 5000, height = 5500, noRStudioGD = TRUE)
+            width = 6.5, height = 7.15, noRStudioGD = TRUE)
 
     # Define the parameters of graph
     mat <- matrix(c(1, 1, 2), 3, 1, byrow = FALSE)
