@@ -9,12 +9,12 @@
 #'   \item{DBHt}{The tree diameter at breast height, cm}
 #'   \item{Height}{The tree height, m}
 #'   \item{Volume}{The tree stem volume, m3}
-#'   \item{AnincreD}{The mean annual increment of diameter at breast height, cm}
-#'   \item{AnincreH}{The mean annual increment of tree height, m}
-#'   \item{AnincreV}{The mean annual increment of tree stem volume, m3}
-#'   \item{AvincreD}{The current annual increment of diameter at breast height, cm}
-#'   \item{AvincreH}{The current annual increment of tree height, m}
-#'   \item{AvincreV}{The current annual increment of tree stem volume, m3}
+#'   \item{AnincreD}{The current annual increment of diameter at breast height, cm/year}
+#'   \item{AnincreH}{The current annual increment of tree height, m/year}
+#'   \item{AnincreV}{The current annual increment of tree stem volume, m3/year}
+#'   \item{AvincreD}{The mean annual increment of diameter at breast height, cm/year}
+#'   \item{AvincreH}{The mean annual increment of tree height, m/year}
+#'   \item{AvincreV}{The mean annual increment of tree stem volume, m3/year}
 #' }
 
 #' @examples

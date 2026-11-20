@@ -25,6 +25,15 @@
 #' ratio anchored to the enclosing tip supplies a bounded fallback. These are
 #' geometric reconstructions, not independently measured historical heights.
 #'
+#' The three increment panels show periodic annual increment for consecutive
+#' five-year-labelled windows (ages 0--5, 5--10, and so on), together with mean
+#' annual increment. Each periodic value is plotted at the ending age and is
+#' calculated as (value at ending age - value at starting age) divided by the
+#' elapsed years. Thus the first point is (value at age 5 - value at age 0) / 5.
+#' Only complete windows are plotted. When an endpoint falls between age
+#' classes, its value is linearly interpolated from unrounded growth estimates.
+#' Current annual increments remain in the returned \code{StemGrowth} table.
+#'
 #' @note The \code{stemanalysis} was performed on individual trees
 #'
 #' @return A list with class "output" containing three data.frame.
@@ -503,49 +512,57 @@ stemanalysism <- function(xtree, stemgrowth = FALSE,
                                  las = 1, cex.lab = 1.1))
     legend("topleft", "(d)", cex = 1.1, box.lty = 0, bg = NULL)
 
-    # Draw graphics for the mean annual increment and current annual increment
-    with(output$StemGrowth, plot(stemdj, AnincreD, type = "l", lty = "dashed", pch = 16,
-                                 col = "blue", lwd = 2, cex = 1.2,
+    # Draw mean annual increment and periodic annual increment. Calculate PAI
+    # from unrounded estimates; retain CAI in the output table above.
+    periodic <- .stem_periodic_increment(Mydata)
+    with(output$StemGrowth, plot(stemdj, AvincreD, type = "l", lty = "dotted",
+                                 col = "red", lwd = 2, cex = 1.2,
                                  xlim = c(0, max(stemdj) + Ageclass),
-                                 ylim = c(0, 1.2 * (max(max(AnincreD), max(AvincreD)))),
+                                 ylim = 1.2 * range(c(0, AvincreD, periodic$PerincreD)),
                                  xlab = "Age (years)",
                                  ylab = expression(paste
                                                    ("DBH increment (cm", " year"^"-1", ")")),
                                  las = 1, cex.lab = 1.1))
-    with(output$StemGrowth, lines(stemdj, AvincreD, lty = "dotted", pch = 16,
-                                  col = "red", lwd = 2, cex = 1.2))
+    if (nrow(periodic) > 0L) {
+      with(periodic, lines(stemdj, PerincreD, type = "b", lty = "dashed",
+                           pch = 16, col = "blue", lwd = 2, cex = 1.2))
+    }
     legend("topleft", "(e)", cex = 1.1, box.lty = 0, bg = NULL)
 
-    with(output$StemGrowth, plot(stemdj, AnincreH, type = "l", lty = "dashed", pch = 1,
-                                 col = "blue", lwd = 2, cex = 1.2,
+    with(output$StemGrowth, plot(stemdj, AvincreH, type = "l", lty = "dotted",
+                                 col = "red", lwd = 2, cex = 1.2,
                                  xlim = c(0, max(stemdj) + Ageclass),
-                                 ylim = c(0, 1.2 * (max(max(AnincreH), max(AvincreH)))),
+                                 ylim = 1.2 * range(c(0, AvincreH, periodic$PerincreH)),
                                  xlab = "Age (years)",
                                  ylab = expression(paste
                                                    ("Height increment (m", " year"^"-1", ")")),
                                  las = 1, cex.lab = 1.1))
-    with(output$StemGrowth, lines(stemdj, AvincreH, lty = "dotted", pch = 16,
-                                  col = "red", lwd = 2, cex = 1.2))
+    if (nrow(periodic) > 0L) {
+      with(periodic, lines(stemdj, PerincreH, type = "b", lty = "dashed",
+                           pch = 16, col = "blue", lwd = 2, cex = 1.2))
+    }
     legend("topleft", "(f)", cex = 1.1, box.lty = 0, bg = NULL)
 
-    with(output$StemGrowth, plot(stemdj, AnincreV, type = "l", lty = "dashed", pch = 1,
-                                 col = "blue", lwd = 2, cex = 1.2,
+    with(output$StemGrowth, plot(stemdj, AvincreV, type = "l", lty = "dotted",
+                                 col = "red", lwd = 2, cex = 1.2,
                                  xlim = c(0, max(stemdj) + Ageclass),
-                                 ylim = c(0, 1.2 * (max(max(AnincreV), max(AvincreV)))),
+                                 ylim = 1.2 * range(c(0, AvincreV, periodic$PerincreV)),
                                  xlab = "Age (years)",
                                  ylab = expression(paste
-                                                   ("Volume increment (m"^"3", " year"^"-1", ")"),
-                                                   las = 1, cex.lab = 1.1)))
-    with(output$StemGrowth, lines(stemdj, AvincreV, lty = "dotted", pch = 16,
-                                  col = "red", lwd = 2, cex = 1.2))
+                                                   ("Volume increment (m"^"3", " year"^"-1", ")")),
+                                 las = 1, cex.lab = 1.1))
+    if (nrow(periodic) > 0L) {
+      with(periodic, lines(stemdj, PerincreV, type = "b", lty = "dashed",
+                           pch = 16, col = "blue", lwd = 2, cex = 1.2))
+    }
     legend("topleft", "(g)", cex = 1.1, box.lty = 0, bg = NULL)
 
     plot(0, 0, type = "n", ann = F, axes = F)
     legend("center",
            inset=c(0, 0),
            col = c("blue", "red"), cex = 1, box.lty = 0, lwd = 2,
-           lty = c("dashed", "dotted"), bg = NULL,
-           c("Current annual increment", "Mean annual increment")
+           lty = c("dashed", "dotted"), pch = c(16, NA), bg = NULL,
+           c("Periodic annual increment (5 years)", "Mean annual increment")
     )
   }
 
@@ -838,4 +855,29 @@ stemanalysism <- function(xtree, stemgrowth = FALSE,
   return(output)
 }
 
+# PAI for the requested age windows 1--5, 6--10, 11--15, ... .
+# Each value uses (value[b] - value[a]) / (b - a), so these endpoints have
+# four elapsed years. This helper is used only for plotting, not table output.
+.stem_periodic_increment <- function(growth) {
+  end <- 5 * seq_len(floor(max(growth$stemdj) / 5))
+  start <- end - 5
+  covered <- start >= min(growth$stemdj)
+  start <- start[covered]
+  end <- end[covered]
+  periodic <- data.frame(stemdj = end,
+                         PerincreD = numeric(length(end)),
+                         PerincreH = numeric(length(end)),
+                         PerincreV = numeric(length(end)))
+  if (!length(end)) return(periodic)
 
+  quantities <- c("DBHt", "Height", "Volume")
+  increments <- c("PerincreD", "PerincreH", "PerincreV")
+  for (i in seq_along(quantities)) {
+    endpoints <- stats::approx(growth$stemdj, growth[[quantities[i]]],
+                               xout = c(start, end), rule = 1)$y
+    n <- length(end)
+    periodic[[increments[i]]] <-
+      (endpoints[n + seq_len(n)] - endpoints[seq_len(n)]) / (end - start)
+  }
+  periodic
+}
