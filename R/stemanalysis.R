@@ -7,6 +7,23 @@
 #' @param stemdata table as described in \code{\link{stemdata}} containing the information about stem analysis data.
 #' @param allompardata table as described in \code{\link{allomPardata}} containing the information about the parameter data of allometric models that can be optionally inputted by users
 #' @param volumepardata table as described in \code{\link{volumePardata}} containing the information about the biomass conversion factor data for volume model that can be optionally inputted by users
+#' @param tip_method Hidden-tip height estimator. The default, \code{"local_slope"},
+#' uses the median inward taper of the nearest enclosing rings measured at both
+#' bounding disc heights. \code{"ratio"} uses the original diameter-ratio height
+#' estimator for comparison.
+#' @param tip_neighbors Positive integer number of nearest enclosing measured
+#' rings used by \code{"local_slope"}; defaults to 3.
+#'
+#' @details Hidden-tip heights are computed once from measured under-bark ring
+#' diameters and shared by the stem profile, height output, and hidden-tip volume.
+#' The stem profile displays these measured diameters; bark-adjusted diameters
+#' remain in use for DBH, volume, and carbon calculations.
+#' For \code{"local_slope"}, only enclosing rings with positive diameters at both
+#' discs and inward taper are used. Tips are bounded by their sampled interval
+#' and enclosing tip. In the final interval the present-day cone supplies the
+#' taper. If no inward measured taper exists in another interval, a diameter
+#' ratio anchored to the enclosing tip supplies a bounded fallback. These are
+#' geometric reconstructions, not independently measured historical heights.
 #'
 #' @note The \code{stemanalysis} was performed on individual trees
 #'
@@ -62,8 +79,11 @@
 
 stemanalysism <- function(xtree, stemgrowth = FALSE,
                           treecarbon = FALSE, HDmodel = FALSE,
-                          stemdata, allompardata, volumepardata) {
+                          stemdata, allompardata, volumepardata,
+                          tip_method = c("local_slope", "ratio"),
+                          tip_neighbors = 3L) {
   Treeno <- output <- NULL
+  tip_method <- match.arg(tip_method)
 
   # list estimation data
   output <- list()
@@ -146,22 +166,17 @@ stemanalysism <- function(xtree, stemgrowth = FALSE,
   }
 
 
-  # Set the initial value for calculating the stem height of each disc
-  TreeH <- seq(1, length(stemdj) - 2, 1)
-
-  # Find the position of the disc that does not reach the height of next disc
+  # Preserve measured ring geometry before estimating diameters with bark.
+  ringdiameters <- as.matrix(stemdata1[, stemj:sstart])
   x <- ceiling(max(stemdj / Ageclass))
-  for (k in seq(1, x - 1, 1)) {
-    ind <- which(stemdata1[, stemj + k] == 0.00)[1]
-
-    # Calculate tree heights at a given age using Ratio method
-    Hitemp <- stemdata1$stemheight[ind - 1] +
-      ((stemdata1[ind - 1, stemj + k]) /
-         (stemdata1[ind - 1, stemj + k - 1])) *
-      (stemdata1$stemheight[ind] - stemdata1$stemheight[ind - 1])
-    TreeH[k] <- Hitemp
+  TreeH <- .stem_tip_heights(stemdata1$stemheight, ringdiameters,
+                             method = tip_method, neighbors = tip_neighbors)
+  if (length(TreeH) != x - 1L) {
+    stop("The diameter columns do not match the inferred age classes")
   }
-  TreeH <- as.numeric(TreeH)
+  tip_rows <- vapply(seq_along(TreeH), function(k) {
+    which(ringdiameters[, k + 1L] == 0)[1L] - 1L
+  }, integer(1L))
   # Calculate the diameter with bark of a given tree age
 
   # Construct the linear relationship between Dwithbark and Dnobark0 of discs
@@ -187,37 +202,30 @@ stemanalysism <- function(xtree, stemgrowth = FALSE,
   # Calculate the stem volume with bark of a given tree age
 
   # Set the initial value for the stem volume of each individual log
-  Vage <- seq(1, length(stemdj) - 2, 1)
+  Vage <- numeric(length(TreeH))
 
   # Set the initial value for the stem volume of the “hidden tip” of the disc
-  VageH <- seq(1, length(stemdj) - 2, 1)
+  VageH <- numeric(length(TreeH))
 
   # Find the position of the disc that does not reach to the height of next disc
-  x <- ceiling(max(stemdj / Ageclass))
-  for (j in seq(1, x - 1, 1)) {
-    ind <- which(stemdata1[, stemj + j] == 0.00)[1]
+  for (j in seq_along(TreeH)) {
+    lower <- tip_rows[j]
+    if (lower == 0L) next
 
     # Set the initial value for calculating the stem volume of each disc
     VageTemp <- 0
-    for (i in seq(1, ind - 2)) {
+    for (i in seq_len(lower - 1L)) {
       # Calculate the stem volume without “hidden tip”
-      if (i > 0) {
-        Vagej <- VageTemp + 3.14 * ((stemdata1[i, (stemj + j)] / 200)^2 +
+      VageTemp <- VageTemp + 3.14 * ((stemdata1[i, (stemj + j)] / 200)^2 +
                                       ((stemdata1[i, (stemj + j)] / 200)+
                                          (stemdata1[i + 1, (stemj + j)] / 200))^2+
                                       (stemdata1[i + 1, (stemj + j)] / 200)^2) *
           (stemdata1$stemheight[i + 1] - stemdata1$stemheight[i]) / 6
-        VageTemp <- Vagej
-
-        # Calculate the stem volume of “hidden tip”
-        VHTemp <- 3.14 * ((stemdata1[i, (stemj + j)] / 200)^2) *
-          (stemdata1$stemheight[i + 1] - stemdata1$stemheight[i]) / 3
-        VageH[j] <- VHTemp
-      } else {
-        Vagej <- 0
-      }
     }
-    Vage[j] <- Vagej
+    Vage[j] <- VageTemp
+    # The cone starts at the last measured disc, including a base-only ring.
+    VageH[j] <- 3.14 * (stemdata1[lower, stemj + j] / 200)^2 *
+      (TreeH[j] - stemdata1$stemheight[lower]) / 3
   }
 
 
@@ -430,7 +438,7 @@ stemanalysism <- function(xtree, stemgrowth = FALSE,
 
     # Draw the base coordinates
     plot(c(0, 0), c(0, hmax), type = "l", lty = "dotted", col = "red",
-         lwd = 2, xlim = c(-ceiling(Dmax / 20), ceiling(Dmax / 20)),
+         lwd = 1, xlim = c(-ceiling(Dmax / 20), ceiling(Dmax / 20)),
          ylim = c(0, ceiling(hmax)), ann = FALSE, axes = FALSE)
     legend("topleft", "(a)", cex = 1.1, box.lty = 0, bg = NULL)
     axis(1, at = seq(-ceiling(Dmax / 20), ceiling(Dmax / 20), 0.2),
@@ -443,82 +451,32 @@ stemanalysism <- function(xtree, stemgrowth = FALSE,
     for (i in stemi) {
       lines(c(-stemdata1$Dwithbark[i] / 20, stemdata1$Dwithbark[i] / 20),
             c(stemdata1$stemheight[i], stemdata1$stemheight[i]),
-            lty = "dotted", col = "red", lwd = 2)
+            lty = "dotted", col = "red", lwd = 1)
     }
     # Draw the lateral surface with and without bark
     for (i in stemi - 1) {
       lines(c(stemdata1$Dwithbark[i] / 20, stemdata1$Dwithbark[i + 1] / 20),
             c(stemdata1$stemheight[i], stemdata1$stemheight[i + 1]),
-            lty = "solid", col = "black", lwd = 2)
+            lty = "solid", col = "black", lwd = 1)
       lines(c(-stemdata1$Dwithbark[i] / 20, -stemdata1$Dwithbark[i + 1] / 20),
             c(stemdata1$stemheight[i], stemdata1$stemheight[i + 1]),
-            lty = "solid", col = "black", lwd = 2)
-      lines(c(stemdata1$ Dnobark0[i] / 20, stemdata1$ Dnobark0[i + 1] / 20),
-            c(stemdata1$stemheight[i], stemdata1$stemheight[i + 1]),
             lty = "solid", col = "black", lwd = 1)
-      lines(c(-stemdata1$ Dnobark0[i] / 20, -stemdata1$ Dnobark0[i + 1] / 20),
+      lines(c(ringdiameters[i, 1L] / 20, ringdiameters[i + 1, 1L] / 20),
             c(stemdata1$stemheight[i], stemdata1$stemheight[i + 1]),
-            lty = "solid", col = "black", lwd = 1)
+            lty = "solid", col = "black", lwd = 0.5)
+      lines(c(-ringdiameters[i, 1L] / 20, -ringdiameters[i + 1, 1L] / 20),
+            c(stemdata1$stemheight[i], stemdata1$stemheight[i + 1]),
+            lty = "solid", col = "black", lwd = 0.5)
     }
 
-    # Find the disc that does not reach the height of next cross-sectional disc
-    # Set the initial value for calculating the stem height of each disc
-    TreeH <- seq(1, length(stemdj) - 2, 1)
-    x <- ceiling(max(stemdj / Ageclass))
-
-    for (k in seq(1, x - 1, 1)) {
-      ind <- which(stemdata1[, stemj + k] == 0.00)[1]
-
-      # Calculate tree heights at a given age using Ratio method
-      Hitemp <- stemdata1$stemheight[ind - 1] +
-        ((stemdata1[ind - 1, stemj + k]) /
-           (stemdata1[ind - 1, stemj + k - 1])) *
-        (stemdata1$stemheight[ind] - stemdata1$stemheight[ind - 1])
-      TreeH[k] <- Hitemp
-
-      # Draw the lateral surface of the individual logs
-      if(ind-2==0){
-      lines(c(stemdata1[1, (stemj + k)] / 20,
-              stemdata1[2, (stemj + k)] / 20),
-            c(0, stemdata1$stemheight[ind]),
-            lty = "solid", col = "black", lwd = 1)
-      lines(c(-stemdata1[1, (stemj + k)] / 20,
-              -stemdata1[2, (stemj + k)] / 20),
-            c(0, stemdata1$stemheight[ind]),
-            lty = "solid", col = "black", lwd = 1)
-      }else if(ind-2==1){
-      lines(c(stemdata1[ind-2, (stemj + k)] / 20,
-              stemdata1[ind-2+1, (stemj + k)] / 20),
-            c(stemdata1$stemheight[ind-2], stemdata1$stemheight[ind-2+1]),
-            lty = "solid", col = "black", lwd = 1)
-      lines(c(-stemdata1[ind-2, (stemj + k)] / 20,
-              -stemdata1[ind-2+1, (stemj + k)] / 20),
-            c(stemdata1$stemheight[ind-2], stemdata1$stemheight[ind-2+1]),
-            lty = "solid", col = "black", lwd = 1)
-
-
-    }else if(ind-2>1){
-            for (i in seq(1, ind - 2)) {
-                  lines(c(stemdata1[i, (stemj + k)] / 20,
-                stemdata1[i+1, (stemj + k)] / 20),
-              c(stemdata1$stemheight[i], stemdata1$stemheight[i+1]),
-              lty = "solid", col = "black", lwd = 1)
-        lines(c(-stemdata1[i, (stemj + k)] / 20,
-                -stemdata1[i+1, (stemj + k)] / 20),
-              c(stemdata1$stemheight[i], stemdata1$stemheight[i+1]),
-              lty = "solid", col = "black", lwd = 1)
-            }
+    # Use exactly the measured radii and tip heights used by the estimator.
+    for (k in seq_along(TreeH)) {
+      observed <- seq_len(tip_rows[k])
+      radius <- c(ringdiameters[observed, k + 1L] / 20, 0)
+      height <- c(stemdata1$stemheight[observed], TreeH[k])
+      lines(radius, height, lty = "solid", col = "black", lwd = 0.5)
+      lines(-radius, height, lty = "solid", col = "black", lwd = 0.5)
     }
-
-
-      # Draw the lateral surface of the “hidden tip” of the disc
-      lines(c(stemdata1[ind - 1, (stemj + k)] / 20, 0),
-            c(stemdata1$stemheight[ind - 1], Hitemp),
-            lty = "solid", col = "black", lwd = 1)
-      lines(c(-stemdata1[ind - 1, (stemj + k)] / 20, 0),
-            c(stemdata1$stemheight[ind - 1], Hitemp),
-            lty = "solid", col = "black", lwd = 1)
-      }
 
 
 
